@@ -11,7 +11,7 @@ namespace Player {
 
         namespace {
 
-            class DRMPlayer : public IPlayerPlatform, Core::Thread {
+            class DRMPlayer : public IPlayerPlatform, public Core::Thread {
             public:
                 DRMPlayer(const DRMPlayer&) = delete;
                 DRMPlayer& operator=(const DRMPlayer&) = delete;

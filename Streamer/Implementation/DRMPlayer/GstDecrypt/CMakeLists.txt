@@ -15,12 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(PLAYER_NAME DRMPlayer)
-set(DRMPLAYER_LIB drmplayer)
-message("Building ${PLAYER_NAME} Streamer....")
+set(GST_CENC_PLUGIN_NAME gstdashdecrypt)
 
-find_package(${NAMESPACE}Core REQUIRED)
 find_package(PkgConfig REQUIRED)
+find_package(${NAMESPACE}Plugins REQUIRED)
 
 pkg_check_modules(GST 
     REQUIRED 
@@ -30,27 +28,23 @@ pkg_check_modules(GST
         gstreamer-app-1.0>=1.4
         gstreamer-base-1.0>=1.4)
 
-set(LIB_NAME PlayerPlatform${PLAYER_NAME})
+add_library(${GST_CENC_PLUGIN_NAME} SHARED "")
 
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/GstDecrypt)
-
-add_library(${LIB_NAME} STATIC
-     PlayerImplementation.cpp)
-
-set_target_properties(${LIB_NAME} PROPERTIES
-        CXX_STANDARD 11
-        CXX_STANDARD_REQUIRED YES)
-
-target_include_directories(${LIB_NAME}
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../
-        # ${CMAKE_CURRENT_SOURCE_DIR}/GstDecrypt
+target_include_directories(${GST_CENC_PLUGIN_NAME}
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${GST_INCLUDE_DIRS})
 
-target_link_libraries(${LIB_NAME}
-    PRIVATE
-        ${NAMESPACE}Core::${NAMESPACE}Core
-        ${GST_LIBRARIES})
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ocdm)
 
-install(TARGETS ${LIB_NAME}
-    DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/)
+target_sources(${GST_CENC_PLUGIN_NAME}
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/GstOcdmDecrypt.cpp)
+
+target_link_libraries(${GST_CENC_PLUGIN_NAME}
+    PUBLIC
+        ${NAMESPACE}Core::${NAMESPACE}Core
+        ${NAMESPACE}Plugins::${NAMESPACE}Plugins 
+        ${GST_LIBRARIES}
+        gstdashdecrypt_ocdm)
+     

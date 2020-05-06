@@ -19,12 +19,11 @@
 
 #pragma once
 
-#include "Module.h"
 #include <gst/base/gstbasetransform.h>
 #include <gst/gst.h>
-#include <ocdm/open_cdm.h>
 
-#include "Challenger.h"
+#include "IExchangeFactory.hpp"
+#include "IGstDecryptor.hpp"
 #include <memory>
 
 G_BEGIN_DECLS
@@ -35,17 +34,16 @@ G_BEGIN_DECLS
 #define GST_IS_OCDMDECRYPT(obj) (G_TYPE_CHECK_INSTANCE_TYPE((obj), GST_TYPE_OCDMDECRYPT))
 #define GST_IS_OCDMDECRYPT_CLASS(obj) (G_TYPE_CHECK_CLASS_TYPE((klass), GST_TYPE_OCDMDECRYPT))
 
-typedef struct _GstOcdmdecrypt GstOcdmdecrypt;
-typedef struct _GstOcdmdecryptClass GstOcdmdecryptClass;
-typedef struct _GstOcdmdecryptImpl GstOcdmDecryptImpl;
+struct GstOcdmdecryptImpl;
 
-struct _GstOcdmdecrypt {
+struct GstOcdmdecrypt {
     GstBaseTransform base_ocdmdecrypt;
-    std::unique_ptr<GstOcdmDecryptImpl> impl;
+    std::unique_ptr<GstOcdmdecryptImpl> _impl;
 };
 
-struct _GstOcdmdecryptClass {
+struct GstOcdmdecryptClass {
     GstBaseTransformClass base_ocdmdecrypt_class;
+    WPEFramework::Core::ProxyType<WPEFramework::CENCDecryptor::IKeySystems> _keySystems;
 };
 
 GType gst_ocdmdecrypt_get_type(void);

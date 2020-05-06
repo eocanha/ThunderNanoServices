@@ -27,7 +27,9 @@ namespace Player {
                 , _data()
                 , _bus(nullptr)
             {
-                gst_init(0, nullptr);
+                if(!gst_is_initialized())
+                    gst_init(0, nullptr);
+                
                 uint16_t speedsLen = config.Speeds.Length();
 
                 if ((config.Speeds.IsSet() == true) && (speedsLen != 0)) {
@@ -46,15 +48,10 @@ namespace Player {
 
             // Core::Thread method
             // -------------------------------------------------------------
-
-            // The g_main_loop_run function is a blocking one.
-            // It's role is to handle incoming messages on the GstBus.
-            // Due to this, it will only be called once, on the first playback startup.
-            // It's exit is tied to the call of DetachDecoder (and indirectly Teardown) method.
             uint32_t DRMPlayer::Worker()
             {
                 g_main_loop_run(_data._mainLoop);
-                return (Core::infinite);
+                return Core::infinite;
             }
 
             uint32_t DRMPlayer::Setup()
@@ -71,12 +68,6 @@ namespace Player {
 
             uint32_t DRMPlayer::SetupGstElements()
             {
-                gst_plugin_register_static(GST_VERSION_MAJOR,
-                    GST_VERSION_MINOR,
-                    "ocdmdecrypt",
-                    "description",
-                    GstCallbacks::plugin_init, "1.0", "LGPL", "package", "package-origin", "website");
-
                 _data._playbin = gst_element_factory_make("playbin", nullptr);
                 _bus = gst_element_get_bus(_data._playbin);
                 gst_bus_add_watch(_bus, (GstBusFunc)GstCallbacks::gstBusCallback, &_data);
@@ -169,7 +160,7 @@ namespace Player {
                 _adminLock.Lock();
 
                 initializeOcdm();
-                gst_element_set_state(_data._playbin, GstState::GST_STATE_NULL);
+                // gst_element_set_state(_data._playbin, GstState::GST_STATE_NULL);
                 g_object_set(_data._playbin, "uri", uri.c_str(), NULL);
 
                 _adminLock.Unlock();

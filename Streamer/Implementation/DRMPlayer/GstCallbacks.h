@@ -1,7 +1,6 @@
 #pragma once
 
 #include "DRMPlayer.h"
-#include "GstOcdmDecrypt.h"
 #include <gst/gst.h>
 
 namespace WPEFramework {
@@ -31,16 +30,18 @@ namespace Player {
                         gst_element_set_state(data->_playbin, GST_STATE_NULL);
                         break;
                     }
+                    case GST_MESSAGE_STATE_CHANGED: {
+                        GstState old_state, new_state;
+                        gst_message_parse_state_changed(message, &old_state, &new_state, NULL);
+                        std::string old_str(gst_element_state_get_name(old_state)), new_str(gst_element_state_get_name(new_state));
+                        std::string filename(old_str + "->" + new_str);
+                        GST_DEBUG_BIN_TO_DOT_FILE_WITH_TS(GST_BIN(data->_playbin), GST_DEBUG_GRAPH_SHOW_ALL, filename.c_str());
+                        break;
+                    }
                     default:
                         break;
                     }
                     return TRUE;
-                }
-
-                static gboolean plugin_init(GstPlugin* plugin)
-                {
-                    return gst_element_register(plugin, "ocdmdecrypt", GST_RANK_PRIMARY,
-                        GST_TYPE_OCDMDECRYPT);
                 }
             } // namespace GstCallbacks
         }
