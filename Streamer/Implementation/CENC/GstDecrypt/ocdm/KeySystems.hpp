@@ -30,5 +30,4 @@ namespace CENCDecryptor {
         }
     };
 }
-
-} // namespace WPEFramework
+}

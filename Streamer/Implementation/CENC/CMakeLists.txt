@@ -16,7 +16,6 @@
 # limitations under the License.
 
 set(PLAYER_NAME CENC)
-message("Building ${PLAYER_NAME} Streamer....")
 
 find_package(${NAMESPACE}Core REQUIRED)
 find_package(PkgConfig REQUIRED)

@@ -232,9 +232,6 @@ void Finalize(GObject* object)
 static gboolean
 plugin_init(GstPlugin* plugin)
 {
-
-    /* FIXME Remember to set the rank if it's an element that is meant
-     to be autoplugged by decodebin. */
     return gst_element_register(plugin, "cencdecrypt", GST_RANK_PRIMARY,
         GST_TYPE_CENCDECRYPT);
 }
