@@ -39,7 +39,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ocdm)
 
 target_sources(${GST_CENC_PLUGIN_NAME}
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/GstOcdmDecrypt.cpp)
+        ${CMAKE_CURRENT_SOURCE_DIR}/GstCencDecrypt.cpp)
 
 target_link_libraries(${GST_CENC_PLUGIN_NAME}
     PUBLIC
@@ -47,4 +47,7 @@ target_link_libraries(${GST_CENC_PLUGIN_NAME}
         ${NAMESPACE}Plugins::${NAMESPACE}Plugins 
         ${GST_LIBRARIES}
         gstdashdecrypt_ocdm)
+
+install(TARGETS ${GST_CENC_PLUGIN_NAME}
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/)
      

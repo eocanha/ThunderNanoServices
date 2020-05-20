@@ -11,12 +11,12 @@ namespace Player {
 
         namespace {
 
-            class DRMPlayer : public IPlayerPlatform, public Core::Thread {
+            class CENC : public IPlayerPlatform, public Core::Thread {
             public:
-                DRMPlayer(const DRMPlayer&) = delete;
-                DRMPlayer& operator=(const DRMPlayer&) = delete;
+                CENC(const CENC&) = delete;
+                CENC& operator=(const CENC&) = delete;
 
-                DRMPlayer(const Exchange::IStream::streamtype streamType, const uint8_t index);
+                CENC(const Exchange::IStream::streamtype streamType, const uint8_t index);
 
             public:
                 struct PipelineData {

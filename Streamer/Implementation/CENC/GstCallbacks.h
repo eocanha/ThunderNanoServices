@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DRMPlayer.h"
+#include "CENC.h"
 #include <gst/gst.h>
 
 namespace WPEFramework {
@@ -8,7 +8,7 @@ namespace Player {
     namespace Implementation {
         namespace {
             namespace GstCallbacks {
-                gboolean gstBusCallback(GstBus* bus, GstMessage* message, DRMPlayer::PipelineData* data)
+                gboolean gstBusCallback(GstBus* bus, GstMessage* message, CENC::PipelineData* data)
                 {
                     switch (GST_MESSAGE_TYPE(message)) {
                     case GST_MESSAGE_ERROR: {

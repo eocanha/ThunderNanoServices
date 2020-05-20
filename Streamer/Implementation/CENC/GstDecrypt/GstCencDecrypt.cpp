@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-#include "GstOcdmDecrypt.hpp"
+#include "GstCencDecrypt.hpp"
 
 #include "IExchangeFactory.hpp"
 
@@ -36,12 +36,13 @@
 
 using namespace WPEFramework::CENCDecryptor;
 
-GST_DEBUG_CATEGORY_STATIC(gst_ocdmdecrypt_debug_category);
-#define GST_CAT_DEFAULT gst_ocdmdecrypt_debug_category
+GST_DEBUG_CATEGORY_STATIC(gst_cencdecrypt_debug_category);
+#define GST_CAT_DEFAULT gst_cencdecrypt_debug_category
 
-G_DEFINE_TYPE_WITH_CODE(GstOcdmdecrypt, gst_ocdmdecrypt, GST_TYPE_BASE_TRANSFORM,
-    GST_DEBUG_CATEGORY_INIT(gst_ocdmdecrypt_debug_category, "ocdmdecrypt", 0,
-        "debug category for ocdmdecrypt element"));
+G_DEFINE_TYPE_WITH_CODE(GstCencDecrypt, gst_cencdecrypt, GST_TYPE_BASE_TRANSFORM,
+    GST_DEBUG_CATEGORY_INIT(gst_cencdecrypt_debug_category, "cencdecrypt", 0,
+        "debug category for cencdecrypt element"));
+
 constexpr static auto clearContentTypes = { "video/mp4", "audio/mp4", "audio/mpeg", "video/x-h264" };
 
 // TODO: This information should be returned from OpenCDM.
@@ -66,16 +67,12 @@ static void AddCapsForKeysystem(GstCaps*& caps, const string& keysystem)
                 "protection-system", G_TYPE_STRING, keysystem.c_str(), NULL));
     }
 }
-static GstCaps* SinkCaps(GstOcdmdecryptClass* klass)
+static GstCaps* SinkCaps(GstCencDecryptClass* klass)
 {
     // Source the types from klass->keysystems
     GstCaps* cencCaps = gst_caps_new_empty();
     for (auto& system : keySystems) {
-        // if (opencdm_is_type_supported(system.first.c_str(), "") == OpenCDMError::ERROR_NONE) {
         AddCapsForKeysystem(cencCaps, system.first);
-        // } else {
-        // TRACE_L1("Keysystem: <%s> not supported by OCDM", system.second.c_str());
-        // }
     }
     return cencCaps;
 }
@@ -88,23 +85,22 @@ static GstCaps* SrcCaps()
     return caps;
 }
 
-struct GstOcdmdecryptImpl {
+struct GstCencDecryptImpl {
     std::unique_ptr<IGstDecryptor> _decryptor;
 };
 
-void gst_ocdmdecrypt_dispose(GObject* object)
+void gst_cencdecrypt_dispose(GObject* object)
 {
-    GstOcdmdecrypt* ocdmdecrypt = GST_OCDMDECRYPT(object);
+    GstCencDecrypt* cencdecrypt = GST_CENCDECRYPT(object);
 
-    GST_DEBUG_OBJECT(ocdmdecrypt, "dispose");
+    GST_DEBUG_OBJECT(cencdecrypt, "dispose");
     // WPEFramework::Core::Singleton::Dispose();
-    /* clean up as possible.  may be called multiple times */
 
-    G_OBJECT_CLASS(gst_ocdmdecrypt_parent_class)->dispose(object);
+    G_OBJECT_CLASS(gst_cencdecrypt_parent_class)->dispose(object);
 }
 
 static void
-gst_ocdmdecrypt_class_init(GstOcdmdecryptClass* klass)
+gst_cencdecrypt_class_init(GstCencDecryptClass* klass)
 {
     GstBaseTransformClass* base_transform_class = GST_BASE_TRANSFORM_CLASS(klass);
 
@@ -122,14 +118,13 @@ gst_ocdmdecrypt_class_init(GstOcdmdecryptClass* klass)
         "FIXME <fixme@example.com>");
 
     G_OBJECT_CLASS(klass)->finalize = Finalize;
-    // G_OBJECT_CLASS(klass)->dispose = gst_ocdmdecrypt_dispose;
 
     base_transform_class->transform_caps = GST_DEBUG_FUNCPTR(TransformCaps);
 
     // TODO:
     base_transform_class->accept_caps = [](GstBaseTransform* trans, GstPadDirection direction,
                                             GstCaps* caps) -> gboolean {
-        GST_FIXME_OBJECT(GST_OCDMDECRYPT(trans), "Element accepts all caps");
+        GST_FIXME_OBJECT(GST_CENCDECRYPT(trans), "Element accepts all caps");
         return TRUE;
     };
 
@@ -137,24 +132,22 @@ gst_ocdmdecrypt_class_init(GstOcdmdecryptClass* klass)
     base_transform_class->sink_event = GST_DEBUG_FUNCPTR(SinkEvent);
 }
 
-static void gst_ocdmdecrypt_init(GstOcdmdecrypt* ocdmdecrypt)
+static void gst_cencdecrypt_init(GstCencDecrypt* cencdecrypt)
 {
-    GstBaseTransform* base = GST_BASE_TRANSFORM(ocdmdecrypt);
+    GstBaseTransform* base = GST_BASE_TRANSFORM(cencdecrypt);
     gst_base_transform_set_in_place(base, TRUE);
     gst_base_transform_set_passthrough(base, FALSE);
     gst_base_transform_set_gap_aware(base, FALSE);
 
-    ocdmdecrypt->_impl = std::move(std::unique_ptr<GstOcdmdecryptImpl>(new GstOcdmdecryptImpl()));
-    ocdmdecrypt->_impl->_decryptor = std::move(std::unique_ptr<OCDMDecryptor>(new OCDMDecryptor()));
-    ocdmdecrypt->_impl->_decryptor->Initialize(std::unique_ptr<ExchangeFactory>(new ExchangeFactory()));
+    cencdecrypt->_impl = std::move(std::unique_ptr<GstCencDecryptImpl>(new GstCencDecryptImpl()));
+    cencdecrypt->_impl->_decryptor = std::move(std::unique_ptr<OCDMDecryptor>(new OCDMDecryptor()));
+    cencdecrypt->_impl->_decryptor->Initialize(std::unique_ptr<ExchangeFactory>(new ExchangeFactory()));
 
-    GST_FIXME_OBJECT(ocdmdecrypt, "Pretty bad leaks");
-    GST_FIXME_OBJECT(ocdmdecrypt, "Decryption doesn't wait for the key status");
-    GST_FIXME_OBJECT(ocdmdecrypt, "Flushing the pipeline doesn't free ocdm system/session");
-    GST_FIXME_OBJECT(ocdmdecrypt, "Element is accepting all caps");
-    GST_FIXME_OBJECT(ocdmdecrypt, "Upstream caps transformation not implemented");
-    GST_FIXME_OBJECT(ocdmdecrypt, "Caps are constructed based on hard coded keysystem values");
-    GST_FIXME_OBJECT(ocdmdecrypt, "Element doesn't handle dash manifests - mpd");
+    GST_FIXME_OBJECT(cencdecrypt, "Flushing the pipeline doesn't free ocdm system/session");
+    GST_FIXME_OBJECT(cencdecrypt, "Element is accepting all caps");
+    GST_FIXME_OBJECT(cencdecrypt, "Upstream caps transformation not implemented");
+    GST_FIXME_OBJECT(cencdecrypt, "Caps are constructed based on hard coded keysystem values");
+    GST_FIXME_OBJECT(cencdecrypt, "Element doesn't handle dash manifests - mpd");
 }
 
 static void clearCencStruct(GstStructure*& structure)
@@ -167,11 +160,11 @@ static void clearCencStruct(GstStructure*& structure)
 static GstCaps* TransformCaps(GstBaseTransform* trans, GstPadDirection direction,
     GstCaps* caps, GstCaps* filter)
 {
-    GstOcdmdecrypt* ocdmdecrypt = GST_OCDMDECRYPT(trans);
+    GstCencDecrypt* cencdecrypt = GST_CENCDECRYPT(trans);
     GstCaps* othercaps;
 
-    GST_DEBUG_OBJECT(ocdmdecrypt, "transform_caps");
-    GST_FIXME_OBJECT(ocdmdecrypt, "Upstream caps transformation not implemented");
+    GST_DEBUG_OBJECT(cencdecrypt, "transform_caps");
+    GST_FIXME_OBJECT(cencdecrypt, "Upstream caps transformation not implemented");
 
     if (direction == GST_PAD_SRC) {
         // TODO:
@@ -204,36 +197,36 @@ static GstCaps* TransformCaps(GstBaseTransform* trans, GstPadDirection direction
 
 static gboolean SinkEvent(GstBaseTransform* trans, GstEvent* event)
 {
-    GstOcdmdecrypt* ocdmdecrypt = GST_OCDMDECRYPT(trans);
-    GST_DEBUG_OBJECT(ocdmdecrypt, "sink_event");
+    GstCencDecrypt* cencdecrypt = GST_CENCDECRYPT(trans);
+    GST_DEBUG_OBJECT(cencdecrypt, "sink_event");
     switch (GST_EVENT_TYPE(event)) {
     case GST_EVENT_PROTECTION: {
 
-        TRACE_L1("SINK EVENT PROTECTION: %ld address: %ld", std::this_thread::get_id(), ocdmdecrypt->_impl->_decryptor.get());
-        gboolean result = ocdmdecrypt->_impl->_decryptor->HandleProtection(event);
+        TRACE_L1("SINK EVENT PROTECTION: %ld address: %ld", std::this_thread::get_id(), cencdecrypt->_impl->_decryptor.get());
+        gboolean result = cencdecrypt->_impl->_decryptor->HandleProtection(event);
         gst_event_unref(event);
         return result;
     }
     default: {
-        return GST_BASE_TRANSFORM_CLASS(gst_ocdmdecrypt_parent_class)->sink_event(trans, event);
+        return GST_BASE_TRANSFORM_CLASS(gst_cencdecrypt_parent_class)->sink_event(trans, event);
     }
     }
 }
 
 static GstFlowReturn TransformIp(GstBaseTransform* trans, GstBuffer* buffer)
 {
-    GstOcdmdecrypt* ocdmdecrypt = GST_OCDMDECRYPT(trans);
+    GstCencDecrypt* cencdecrypt = GST_CENCDECRYPT(trans);
 
-    GST_DEBUG_OBJECT(ocdmdecrypt, "transform_ip");
+    GST_DEBUG_OBJECT(cencdecrypt, "transform_ip");
 
-    return ocdmdecrypt->_impl->_decryptor->Decrypt(buffer);
+    return cencdecrypt->_impl->_decryptor->Decrypt(buffer);
 }
 
 void Finalize(GObject* object)
 {
-    GstOcdmdecrypt* ocdmdecrypt = GST_OCDMDECRYPT(object); 
-    GST_DEBUG_OBJECT(ocdmdecrypt, "finalize");
-    G_OBJECT_CLASS(gst_ocdmdecrypt_parent_class)->finalize(object);
+    GstCencDecrypt* cencdecrypt = GST_CENCDECRYPT(object);
+    GST_DEBUG_OBJECT(cencdecrypt, "finalize");
+    G_OBJECT_CLASS(gst_cencdecrypt_parent_class)->finalize(object);
 }
 
 static gboolean
@@ -242,8 +235,8 @@ plugin_init(GstPlugin* plugin)
 
     /* FIXME Remember to set the rank if it's an element that is meant
      to be autoplugged by decodebin. */
-    return gst_element_register(plugin, "ocdmdecrypt", GST_RANK_PRIMARY + 10,
-        GST_TYPE_OCDMDECRYPT);
+    return gst_element_register(plugin, "cencdecrypt", GST_RANK_PRIMARY,
+        GST_TYPE_CENCDECRYPT);
 }
 
 #ifndef VERSION
@@ -261,6 +254,6 @@ plugin_init(GstPlugin* plugin)
 
 GST_PLUGIN_DEFINE(GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
-    ocdmdecrypt,
+    cencdecrypt,
     "FIXME plugin description",
     plugin_init, VERSION, "LGPL", PACKAGE_NAME, GST_PACKAGE_ORIGIN)

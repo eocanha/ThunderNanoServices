@@ -80,7 +80,6 @@ namespace CENCDecryptor {
         _response = res;
         std::string str;
         _response->ToString(str);
-        fprintf(stderr, "\n\nresponse: %s\n\n", str.c_str());
         _resReceived.SetEvent();
     }
 
@@ -94,7 +93,6 @@ namespace CENCDecryptor {
         std::string str;
         _request->ToString(str);
         if (IsOpen()) {
-            fprintf(stderr, "\n\n\n Submitting request: \n\n %s", str.c_str());
             Submit(_request);
         }
     }
@@ -114,7 +112,6 @@ namespace CENCDecryptor {
         if (waitResult != Core::ERROR_NONE) {
             TRACE_L1("Error while sending challenge request <%d>", waitResult);
         } else {
-            TRACE_L1("aslkdalksjdlkajsdlk");
             this->_requestData.licenseHandler->Response(this->_requestData.licenseRequest,
                 this->_challenger.Response());
         }

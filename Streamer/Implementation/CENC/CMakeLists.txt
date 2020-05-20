@@ -15,8 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(PLAYER_NAME DRMPlayer)
-set(DRMPLAYER_LIB drmplayer)
+set(PLAYER_NAME CENC)
 message("Building ${PLAYER_NAME} Streamer....")
 
 find_package(${NAMESPACE}Core REQUIRED)
@@ -44,7 +43,6 @@ set_target_properties(${LIB_NAME} PROPERTIES
 target_include_directories(${LIB_NAME}
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/../../
-        # ${CMAKE_CURRENT_SOURCE_DIR}/GstDecrypt
         ${GST_INCLUDE_DIRS})
 
 target_link_libraries(${LIB_NAME}

@@ -28,24 +28,24 @@
 
 G_BEGIN_DECLS
 
-#define GST_TYPE_OCDMDECRYPT (gst_ocdmdecrypt_get_type())
-#define GST_OCDMDECRYPT(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), GST_TYPE_OCDMDECRYPT, GstOcdmdecrypt))
-#define GST_OCDMDECRYPT_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass), GST_TYPE_OCDMDECRYPT, GstOcdmdecryptClass))
-#define GST_IS_OCDMDECRYPT(obj) (G_TYPE_CHECK_INSTANCE_TYPE((obj), GST_TYPE_OCDMDECRYPT))
-#define GST_IS_OCDMDECRYPT_CLASS(obj) (G_TYPE_CHECK_CLASS_TYPE((klass), GST_TYPE_OCDMDECRYPT))
+#define GST_TYPE_CENCDECRYPT (gst_cencdecrypt_get_type())
+#define GST_CENCDECRYPT(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), GST_TYPE_CENCDECRYPT, GstCencDecrypt))
+#define GST_CENCDECRYPT_CLASS(klass) (G_TYPE_CHECK_CLASS_CAST((klass), GST_TYPE_CENCDECRYPT, GstCencDecryptClass))
+#define GST_IS_CENCDECRYPT(obj) (G_TYPE_CHECK_INSTANCE_TYPE((obj), GST_TYPE_CENCDECRYPT))
+#define GST_IS_GST_TYPE_CENCDECRYPT_CLASS(obj) (G_TYPE_CHECK_CLASS_TYPE((klass), GST_TYPE_CENCDECRYPT))
 
-struct GstOcdmdecryptImpl;
+struct GstCencDecryptImpl;
 
-struct GstOcdmdecrypt {
-    GstBaseTransform base_ocdmdecrypt;
-    std::unique_ptr<GstOcdmdecryptImpl> _impl;
+struct GstCencDecrypt {
+    GstBaseTransform base_cencdecrypt;
+    std::unique_ptr<GstCencDecryptImpl> _impl;
 };
 
-struct GstOcdmdecryptClass {
-    GstBaseTransformClass base_ocdmdecrypt_class;
+struct GstCencDecryptClass {
+    GstBaseTransformClass base_cencdecrypt_class;
     WPEFramework::Core::ProxyType<WPEFramework::CENCDecryptor::IKeySystems> _keySystems;
 };
 
-GType gst_ocdmdecrypt_get_type(void);
+GType gst_cencdecrypt_get_type(void);
 
 G_END_DECLS
