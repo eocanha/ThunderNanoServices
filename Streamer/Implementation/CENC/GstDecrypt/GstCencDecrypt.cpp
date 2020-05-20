@@ -25,14 +25,13 @@
 #include "ocdm/ExchangeFactory.hpp"
 #include "ocdm/KeySystems.hpp"
 
-#include <array>
 #include <core/Queue.h>
+
 #include <gst/base/gstbasetransform.h>
 #include <gst/gst.h>
 #include <gst/gstprotection.h>
+
 #include <map>
-#include <thread>
-#include <vector>
 
 using namespace WPEFramework::CENCDecryptor;
 
@@ -69,7 +68,6 @@ static void AddCapsForKeysystem(GstCaps*& caps, const string& keysystem)
 }
 static GstCaps* SinkCaps(GstCencDecryptClass* klass)
 {
-    // Source the types from klass->keysystems
     GstCaps* cencCaps = gst_caps_new_empty();
     for (auto& system : keySystems) {
         AddCapsForKeysystem(cencCaps, system.first);
@@ -104,9 +102,6 @@ gst_cencdecrypt_class_init(GstCencDecryptClass* klass)
 {
     GstBaseTransformClass* base_transform_class = GST_BASE_TRANSFORM_CLASS(klass);
 
-    //TODO
-    // klass->_keySystems = new WPEFramework::CENCDecryptor::OCDMKeySystems();
-
     gst_element_class_add_pad_template(GST_ELEMENT_CLASS(klass),
         gst_pad_template_new("src", GST_PAD_SRC, GST_PAD_ALWAYS, SrcCaps()));
 
@@ -121,7 +116,6 @@ gst_cencdecrypt_class_init(GstCencDecryptClass* klass)
 
     base_transform_class->transform_caps = GST_DEBUG_FUNCPTR(TransformCaps);
 
-    // TODO:
     base_transform_class->accept_caps = [](GstBaseTransform* trans, GstPadDirection direction,
                                             GstCaps* caps) -> gboolean {
         GST_FIXME_OBJECT(GST_CENCDECRYPT(trans), "Element accepts all caps");
@@ -201,8 +195,6 @@ static gboolean SinkEvent(GstBaseTransform* trans, GstEvent* event)
     GST_DEBUG_OBJECT(cencdecrypt, "sink_event");
     switch (GST_EVENT_TYPE(event)) {
     case GST_EVENT_PROTECTION: {
-
-        TRACE_L1("SINK EVENT PROTECTION: %ld address: %ld", std::this_thread::get_id(), cencdecrypt->_impl->_decryptor.get());
         gboolean result = cencdecrypt->_impl->_decryptor->HandleProtection(event);
         gst_event_unref(event);
         return result;

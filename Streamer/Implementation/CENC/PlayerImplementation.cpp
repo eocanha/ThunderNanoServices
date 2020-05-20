@@ -17,8 +17,8 @@
  * limitations under the License.
  */
 
-#include "CENC.h"
-#include "GstCallbacks.h"
+#include "CENC.hpp"
+#include "GstCallbacks.hpp"
 
 #include <opencdm/open_cdm.h>
 #include <sys/syscall.h>

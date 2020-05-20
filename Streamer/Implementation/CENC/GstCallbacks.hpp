@@ -19,7 +19,6 @@
 
 #pragma once
 
-#include "CENC.h"
 #include <gst/gst.h>
 
 namespace WPEFramework {

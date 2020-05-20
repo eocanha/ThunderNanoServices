@@ -49,5 +49,5 @@ target_link_libraries(${GST_CENC_PLUGIN_NAME}
         gstdashdecrypt_ocdm)
 
 install(TARGETS ${GST_CENC_PLUGIN_NAME}
-        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/)
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/gstreamer-1.0)
      
