@@ -48,8 +48,7 @@ static std::map<std::string, std::string> keySystems{ { "edef8ba9-79d6-4ace-a3c8
 constexpr static auto cencPrefix = "application/x-cenc";
 
 // Overwritten GstBaseTransform callbacks:
-static GstCaps*
-TransformCaps(GstBaseTransform* trans, GstPadDirection direction,
+static GstCaps* TransformCaps(GstBaseTransform* trans, GstPadDirection direction,
     GstCaps* caps, GstCaps* filter);
 static gboolean SinkEvent(GstBaseTransform* trans, GstEvent* event);
 static GstFlowReturn TransformIp(GstBaseTransform* trans, GstBuffer* buffer);
@@ -84,6 +83,7 @@ static GstCaps* SrcCaps()
 
 struct GstCencDecryptImpl {
     std::unique_ptr<IGstDecryptor> _decryptor;
+    std::string _keySystem;
 };
 
 void gst_cencdecrypt_dispose(GObject* object)
@@ -113,13 +113,6 @@ static void gst_cencdecrypt_class_init(GstCencDecryptClass* klass)
 
     base_transform_class->transform_caps = GST_DEBUG_FUNCPTR(TransformCaps);
     base_transform_class->transform_ip_on_passthrough = FALSE;
-
-    base_transform_class->accept_caps = [](GstBaseTransform* trans, GstPadDirection direction,
-                                            GstCaps* caps) -> gboolean {
-        GST_FIXME_OBJECT(GST_CENCDECRYPT(trans), "Element accepts all caps");
-        return TRUE;
-    };
-
     base_transform_class->transform_ip = GST_DEBUG_FUNCPTR(TransformIp);
     base_transform_class->sink_event = GST_DEBUG_FUNCPTR(SinkEvent);
 }
@@ -141,47 +134,59 @@ static void gst_cencdecrypt_init(GstCencDecrypt* cencdecrypt)
     GST_FIXME_OBJECT(cencdecrypt, "Element doesn't handle dash manifests - mpd");
 }
 
-static void clearCencStruct(GstStructure*& structure)
+static gboolean SrcCapsTransform(GstCapsFeatures* features,
+    GstStructure* structure,
+    gpointer user_data)
+{
+    // gst_structure_remove_fields takes care of checking
+    // if a field with a corresponding name exists.
+    GstCencDecryptImpl* impl = reinterpret_cast<GstCencDecryptImpl*>(user_data);
+
+    gst_structure_remove_fields(structure, "base-profile",
+        "codec_data",
+        "height",
+        "framerate",
+        "level",
+        "pixel-aspect-ratio",
+        "profile",
+        "rate",
+        "width");
+
+    gst_structure_set(structure, "original-media-type", G_TYPE_STRING, gst_structure_get_name(structure), nullptr);
+    gst_structure_set(structure,
+        "protection-system", G_TYPE_STRING, impl->_keySystem.c_str(), nullptr);
+    gst_structure_set_name(structure, cencPrefix);
+}
+
+static gboolean SinkCapsTransform(GstCapsFeatures* features,
+    GstStructure* structure,
+    gpointer user_data)
 {
     gst_structure_set_name(structure, gst_structure_get_string(structure, "original-media-type"));
     gst_structure_remove_field(structure, "protection-system");
     gst_structure_remove_field(structure, "original-media-type");
+    return TRUE;
 }
 
 static GstCaps* TransformCaps(GstBaseTransform* trans, GstPadDirection direction,
     GstCaps* caps, GstCaps* filter)
 {
     GstCencDecrypt* cencdecrypt = GST_CENCDECRYPT(trans);
-    GstCaps* othercaps;
+    GstCaps* othercaps = gst_caps_copy(caps);
 
     GST_DEBUG_OBJECT(cencdecrypt, "transform_caps");
 
     if (direction == GST_PAD_SRC) {
         GST_DEBUG_OBJECT(cencdecrypt, "Transforming caps going upstream");
-
-        othercaps = gst_caps_copy(caps);
-        // transformSrcCaps(otherCaps);
+        gst_caps_filter_and_map_in_place(othercaps, SrcCapsTransform, nullptr);
 
     } else {
         GST_DEBUG_OBJECT(cencdecrypt, "Transforming caps going downstream");
-        othercaps = gst_caps_new_empty();
-        size_t size = gst_caps_get_size(caps);
-        for (size_t index = 0; index < size; ++index) {
-
-            // TODO: free upstreamStruct?
-            GstStructure* upstreamStruct = gst_caps_get_structure(caps, index);
-            GstStructure* copyUpstream = gst_structure_copy(upstreamStruct);
-
-            // Removes all fields related to encryption, so the downstream caps intersection succeeds.
-            clearCencStruct(copyUpstream);
-            // "othercaps" become the owner of the "copyUpstream" structure, so no need to free.
-            gst_caps_append_structure(othercaps, copyUpstream);
-        }
+        gst_caps_filter_and_map_in_place(othercaps, SinkCapsTransform, nullptr);
     }
 
     if (filter) {
         GstCaps* intersect;
-        othercaps = gst_caps_copy(caps);
         intersect = gst_caps_intersect(othercaps, filter);
         gst_caps_unref(othercaps);
         othercaps = intersect;
@@ -199,6 +204,8 @@ static gboolean SinkEvent(GstBaseTransform* trans, GstEvent* event)
         GstBuffer* initData;
 
         gst_event_parse_protection(event, &systemId, &initData, &origin);
+        cencdecrypt->_impl->_keySystem = systemId;
+
         BufferView initDataView(initData, GST_MAP_READ);
 
         gboolean result = cencdecrypt->_impl->_decryptor->Initialize(
