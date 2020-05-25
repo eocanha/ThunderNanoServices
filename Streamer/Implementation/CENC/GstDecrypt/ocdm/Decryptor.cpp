@@ -42,31 +42,28 @@ namespace CENCDecryptor {
     {
     }
 
-    gboolean OCDMDecryptor::Initialize(std::unique_ptr<IExchangeFactory> factory)
+    gboolean OCDMDecryptor::Initialize(std::unique_ptr<IExchangeFactory> factory,
+        const std::string& keysystem,
+        const std::string& origin,
+        BufferView& initData)
     {
         _factory = std::move(factory);
-        return TRUE;
+        return SetupOCDM(keysystem, origin, initData);
     }
 
-    gboolean OCDMDecryptor::HandleProtection(GstEvent* event)
+    bool OCDMDecryptor::SetupOCDM(const std::string& keysystem,
+        const std::string& origin,
+        BufferView& initData)
     {
-        gboolean result = TRUE;
-
         if (_system == nullptr) {
-
-            CENCSystemMetadata metadata;
-            ParseProtectionEvent(metadata, *event);
-            auto domainName = GetDomainName(metadata.keySystem.c_str());
+            auto domainName = GetDomainName(keysystem.c_str());
             _system = opencdm_create_system(domainName.c_str());
             if (_system != nullptr) {
-
-                BufferView dataView(metadata.initData, GST_MAP_READ);
-
                 OpenCDMError ocdmResult = opencdm_construct_session(_system,
                     LicenseType::Temporary,
                     "cenc",
-                    dataView.Raw(),
-                    static_cast<uint16_t>(dataView.Size()),
+                    initData.Raw(),
+                    static_cast<uint16_t>(initData.Size()),
                     nullptr,
                     0,
                     &_callbacks,
@@ -74,53 +71,51 @@ namespace CENCDecryptor {
                     &_session);
 
                 if (ocdmResult != OpenCDMError::ERROR_NONE) {
-                    result = FALSE;
                     TRACE_L1("Failed to construct session with error: <%d>", ocdmResult);
+                    return false;
                 }
 
             } else {
-                TRACE_L1("Cannot construct opencdm_system for <%s> keysystem", metadata.keySystem.c_str());
-                result = FALSE;
+                TRACE_L1("Cannot construct opencdm_system for <%s> keysystem", keysystem.c_str());
+                return false;
             }
         }
-
-        return result;
+        return true;
     }
 
-    GstFlowReturn OCDMDecryptor::Decrypt(GstBuffer* buffer)
+    // TODO: Should this be provided by the ocdm?
+    std::string OCDMDecryptor::GetDomainName(const std::string& guid)
     {
-        DecryptionMetadata dashData;
-        ParseDecryptionData(dashData, *buffer);
+        if (guid == "edef8ba9-79d6-4ace-a3c8-27dcd51d21ed")
+            return "com.widevine.alpha";
+        else if (guid == "9a04f079-9840-4286-ab92-e65be0885f95")
+            return "com.microsoft.playready";
+        else
+            return "";
+    }
 
-        if (dashData.isClear())
+    GstFlowReturn OCDMDecryptor::Decrypt(std::shared_ptr<EncryptedBuffer> buffer)
+    {
+        if (buffer->IsClear())
             return GST_FLOW_OK;
 
-        if (dashData.IsValid()) {
-            BufferView dataView(dashData.keyID, GST_MAP_READ);
-
-            // TODO: The key might still arrive within a short period of time.
-            KeyStatus keyStatus = opencdm_session_status(_session, dataView.Raw(), dataView.Size());
-            uint32_t result = Core::ERROR_NONE;
-
-            if (keyStatus != KeyStatus::Usable) {
-                TRACE_L1("Waiting for the key to arrive with timeout: <%d>", Core::infinite);
-                result = _keyReceived.Lock(Core::infinite);
-            }
-
-            if (result == Core::ERROR_NONE) {
+        if (buffer->IsValid()) {
+            BufferView keyIdView(buffer->KeyId(), GST_MAP_READ);
+            uint32_t waitResult = WaitForKeyId(keyIdView, Core::infinite);
+            if (waitResult == Core::ERROR_NONE) {
                 OpenCDMError result = opencdm_gstreamer_session_decrypt(_session,
-                    buffer,
-                    dashData.subSample,
-                    dashData.subSampleCount,
-                    dashData.IV,
-                    dashData.keyID,
+                    buffer->Buffer(),
+                    buffer->SubSample(),
+                    buffer->SubSampleCount(),
+                    buffer->IV(),
+                    buffer->KeyId(),
                     0);
 
-                gst_buffer_remove_meta(buffer, reinterpret_cast<GstMeta*>(dashData.protectionMeta));
+                buffer->StripProtection();
 
                 return result != OpenCDMError::ERROR_NONE ? GST_FLOW_NOT_SUPPORTED : GST_FLOW_OK;
             } else {
-                TRACE_L1("Abandoning decryption with result: <%d>", result);
+                TRACE_L1("Waiting for key failed with: <%d>", waitResult);
                 return GST_FLOW_NOT_SUPPORTED;
             }
 
@@ -130,25 +125,16 @@ namespace CENCDecryptor {
         }
     }
 
-    void OCDMDecryptor::ParseProtectionEvent(CENCSystemMetadata& metadata, GstEvent& event)
+    uint32_t OCDMDecryptor::WaitForKeyId(BufferView& keyId, uint32_t timeout)
     {
-        const char* systemId = nullptr;
-        const char* origin = nullptr;
-        GstBuffer* data = nullptr;
+        KeyStatus keyStatus = opencdm_session_status(_session, keyId.Raw(), keyId.Size());
+        uint32_t result = Core::ERROR_NONE;
 
-        gst_event_parse_protection(&event, &systemId, &data, &origin);
-        metadata.keySystem.assign(systemId);
-        metadata.origin.assign(origin);
-        metadata.initData = data;
-    }
-
-    std::string OCDMDecryptor::GetDomainName(const std::string& guid)
-    {
-        // TODO: This is a mocked version of what should be provided from ocdm.
-        if (guid == "edef8ba9-79d6-4ace-a3c8-27dcd51d21ed")
-            return "com.widevine.alpha";
-        else if (guid == "9a04f079-9840-4286-ab92-e65be0885f95")
-            return "com.microsoft.playready";
+        if (keyStatus != KeyStatus::Usable) {
+            TRACE_L1("Waiting for the key to arrive with timeout: <%d>", Core::infinite);
+            result = _keyReceived.Lock(Core::infinite);
+        }
+        return result;
     }
 
     Core::ProxyType<Web::Request> OCDMDecryptor::PrepareChallenge(const string& challenge)
@@ -171,42 +157,6 @@ namespace CENCDecryptor {
         request->ContentLength = reqBodyStr.length();
 
         return request;
-    }
-
-    void OCDMDecryptor::ParseDecryptionData(DecryptionMetadata& metadata, GstBuffer& buffer)
-    {
-        GstProtectionMeta* protectionMeta = reinterpret_cast<GstProtectionMeta*>(gst_buffer_get_protection_meta(&buffer));
-        if (!protectionMeta) {
-            metadata.protectionMeta = nullptr;
-        } else {
-            gst_structure_remove_field(protectionMeta->info, "stream-encryption-events");
-
-            const GValue* value;
-            value = gst_structure_get_value(protectionMeta->info, "kid");
-
-            metadata.keyID = gst_value_get_buffer(value);
-
-            unsigned ivSize;
-            gst_structure_get_uint(protectionMeta->info, "iv_size", &ivSize);
-
-            gboolean encrypted;
-            gst_structure_get_boolean(protectionMeta->info, "encrypted", &encrypted);
-
-            if (!ivSize || !encrypted) {
-                gst_buffer_remove_meta(&buffer, reinterpret_cast<GstMeta*>(protectionMeta));
-                metadata.protectionMeta = nullptr;
-            } else {
-                gst_structure_get_uint(protectionMeta->info, "subsample_count", &metadata.subSampleCount);
-                if (metadata.subSampleCount) {
-                    const GValue* value2 = gst_structure_get_value(protectionMeta->info, "subsamples");
-                    metadata.subSample = gst_value_get_buffer(value2);
-                }
-
-                const GValue* value3;
-                value3 = gst_structure_get_value(protectionMeta->info, "iv");
-                metadata.IV = gst_value_get_buffer(value3);
-            }
-        }
     }
 }
 }

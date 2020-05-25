@@ -19,25 +19,41 @@
 
 #pragma once
 
-#include "IExchangeFactory.hpp"
-#include "IKeySystems.hpp"
-#include "GstBufferView.hpp"
-#include "EncryptedBuffer.hpp"
-
 #include <gst/gstbuffer.h>
-#include <gst/gstevent.h>
+#include <gst/gstprotection.h>
 
 namespace WPEFramework {
 namespace CENCDecryptor {
-    class IGstDecryptor {
+    class EncryptedBuffer {
     public:
-        virtual gboolean Initialize(std::unique_ptr<IExchangeFactory>,
-            const std::string& keysystem,
-            const std::string& origin,
-            BufferView& initData)
-            = 0;
+        EncryptedBuffer() = delete;
+        EncryptedBuffer(GstBuffer*);
 
-        virtual GstFlowReturn Decrypt(std::shared_ptr<EncryptedBuffer>) = 0;
+        EncryptedBuffer(const EncryptedBuffer&) = default;
+        EncryptedBuffer& operator=(const EncryptedBuffer&) = default;
+
+        GstBuffer* Buffer();
+        GstBuffer* SubSample();
+        size_t SubSampleCount();
+        GstBuffer* IV();
+        GstBuffer* KeyId();
+
+        bool IsClear();
+        bool IsValid(); // TODO: name?
+
+        void StripProtection();
+
+    protected:
+        virtual void ExtractDecryptMeta(GstBuffer*);
+
+        GstBuffer* _buffer;
+        GstBuffer* _subSample;
+        size_t _subSampleSize;
+        GstBuffer* _initialVec;
+        GstBuffer* _keyId;
+
+        bool _isClear;
+        GstProtectionMeta* _protectionMeta;
     };
 }
 }

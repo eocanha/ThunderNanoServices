@@ -39,7 +39,8 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ocdm)
 
 target_sources(${GST_CENC_PLUGIN_NAME}
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/GstCencDecrypt.cpp)
+        ${CMAKE_CURRENT_SOURCE_DIR}/GstCencDecrypt.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/EncryptedBuffer.cpp)
 
 target_link_libraries(${GST_CENC_PLUGIN_NAME}
     PUBLIC

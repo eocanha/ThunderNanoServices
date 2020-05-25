@@ -19,13 +19,12 @@
 
 #pragma once
 
+#include "EncryptedBuffer.hpp"
 #include "GstBufferView.hpp"
 #include "IExchangeFactory.hpp"
 #include "IGstDecryptor.hpp"
 #include "ResponseCallback.hpp"
 #include <ocdm/open_cdm.h>
-
-#include <gst/gstprotection.h>
 
 namespace WPEFramework {
 namespace CENCDecryptor {
@@ -35,41 +34,17 @@ namespace CENCDecryptor {
         OCDMDecryptor(const OCDMDecryptor&) = delete;
         OCDMDecryptor& operator=(const OCDMDecryptor&) = delete;
 
-        gboolean Initialize(std::unique_ptr<IExchangeFactory>) override;
+        gboolean Initialize(std::unique_ptr<IExchangeFactory>,
+            const std::string& keysystem,
+            const std::string& origin,
+            BufferView& initData) override;
 
-        gboolean HandleProtection(GstEvent*) override;
-        GstFlowReturn Decrypt(GstBuffer*) override;
+        GstFlowReturn Decrypt(std::shared_ptr<EncryptedBuffer>) override;
 
     private:
-        struct DecryptionMetadata {
-            GstBuffer* subSample;
-            uint32_t subSampleCount;
-            GstBuffer* IV;
-            GstBuffer* keyID;
-            GstProtectionMeta* protectionMeta;
-
-            bool isClear() { return protectionMeta == nullptr; }
-
-            bool IsValid()
-            {
-                return subSample != nullptr
-                    && subSampleCount > 0
-                    && IV != nullptr
-                    && keyID != nullptr;
-            }
-        };
-
-        struct CENCSystemMetadata {
-            std::string keySystem;
-            std::string origin;
-            GstBuffer* initData;
-
-            bool CheckIntegrity() { return !keySystem.empty() && !origin.empty() && initData != nullptr; }
-        };
-
-        void ParseProtectionEvent(CENCSystemMetadata& metadata, GstEvent& event);
-        void ParseDecryptionData(DecryptionMetadata&, GstBuffer& buffer);
+        bool SetupOCDM(const std::string& keysystem, const std::string& origin, BufferView& initData);
         std::string GetDomainName(const std::string& guid);
+        uint32_t WaitForKeyId(BufferView& keyId, uint32_t timeout);
 
         OpenCDMSystem* _system;
         OpenCDMSession* _session;
@@ -137,7 +112,6 @@ namespace CENCDecryptor {
 
         void ErrorMessageCallback()
         {
-            TRACE_L1("Error Message Callback called");
         }
 
         void KeysUpdatedCallback()

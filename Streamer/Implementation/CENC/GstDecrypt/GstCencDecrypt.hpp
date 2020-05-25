@@ -43,7 +43,6 @@ struct GstCencDecrypt {
 
 struct GstCencDecryptClass {
     GstBaseTransformClass base_cencdecrypt_class;
-    WPEFramework::Core::ProxyType<WPEFramework::CENCDecryptor::IKeySystems> _keySystems;
 };
 
 GType gst_cencdecrypt_get_type(void);

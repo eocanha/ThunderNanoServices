@@ -25,8 +25,6 @@
 #include "ocdm/ExchangeFactory.hpp"
 #include "ocdm/KeySystems.hpp"
 
-#include <core/Queue.h>
-
 #include <gst/base/gstbasetransform.h>
 #include <gst/gst.h>
 #include <gst/gstprotection.h>
@@ -78,8 +76,9 @@ static GstCaps* SinkCaps(GstCencDecryptClass* klass)
 static GstCaps* SrcCaps()
 {
     GstCaps* caps = gst_caps_new_empty();
-    for (auto& type : clearContentTypes)
+    for (auto& type : clearContentTypes) {
         gst_caps_append_structure(caps, gst_structure_new_from_string(type));
+    }
     return caps;
 }
 
@@ -92,13 +91,11 @@ void gst_cencdecrypt_dispose(GObject* object)
     GstCencDecrypt* cencdecrypt = GST_CENCDECRYPT(object);
 
     GST_DEBUG_OBJECT(cencdecrypt, "dispose");
-    // WPEFramework::Core::Singleton::Dispose();
 
     G_OBJECT_CLASS(gst_cencdecrypt_parent_class)->dispose(object);
 }
 
-static void
-gst_cencdecrypt_class_init(GstCencDecryptClass* klass)
+static void gst_cencdecrypt_class_init(GstCencDecryptClass* klass)
 {
     GstBaseTransformClass* base_transform_class = GST_BASE_TRANSFORM_CLASS(klass);
 
@@ -106,7 +103,7 @@ gst_cencdecrypt_class_init(GstCencDecryptClass* klass)
         gst_pad_template_new("src", GST_PAD_SRC, GST_PAD_ALWAYS, SrcCaps()));
 
     gst_element_class_add_pad_template(GST_ELEMENT_CLASS(klass),
-        gst_pad_template_new("sink", GST_PAD_SINK, GST_PAD_ALWAYS, SinkCaps(klass))); // TODO: KeySystemzzz
+        gst_pad_template_new("sink", GST_PAD_SINK, GST_PAD_ALWAYS, SinkCaps(klass)));
 
     gst_element_class_set_static_metadata(GST_ELEMENT_CLASS(klass),
         "FIXME Long name", GST_ELEMENT_FACTORY_KLASS_DECRYPTOR, "FIXME Description",
@@ -115,6 +112,7 @@ gst_cencdecrypt_class_init(GstCencDecryptClass* klass)
     G_OBJECT_CLASS(klass)->finalize = Finalize;
 
     base_transform_class->transform_caps = GST_DEBUG_FUNCPTR(TransformCaps);
+    base_transform_class->transform_ip_on_passthrough = FALSE;
 
     base_transform_class->accept_caps = [](GstBaseTransform* trans, GstPadDirection direction,
                                             GstCaps* caps) -> gboolean {
@@ -135,7 +133,6 @@ static void gst_cencdecrypt_init(GstCencDecrypt* cencdecrypt)
 
     cencdecrypt->_impl = std::move(std::unique_ptr<GstCencDecryptImpl>(new GstCencDecryptImpl()));
     cencdecrypt->_impl->_decryptor = std::move(std::unique_ptr<OCDMDecryptor>(new OCDMDecryptor()));
-    cencdecrypt->_impl->_decryptor->Initialize(std::unique_ptr<ExchangeFactory>(new ExchangeFactory()));
 
     GST_FIXME_OBJECT(cencdecrypt, "Flushing the pipeline doesn't free ocdm system/session");
     GST_FIXME_OBJECT(cencdecrypt, "Element is accepting all caps");
@@ -158,17 +155,20 @@ static GstCaps* TransformCaps(GstBaseTransform* trans, GstPadDirection direction
     GstCaps* othercaps;
 
     GST_DEBUG_OBJECT(cencdecrypt, "transform_caps");
-    GST_FIXME_OBJECT(cencdecrypt, "Upstream caps transformation not implemented");
 
     if (direction == GST_PAD_SRC) {
-        // TODO:
-        // Fired on reconfigure events.
+        GST_DEBUG_OBJECT(cencdecrypt, "Transforming caps going upstream");
+
         othercaps = gst_caps_copy(caps);
+        // transformSrcCaps(otherCaps);
+
     } else {
-        GST_INFO("Transforming caps going downstream");
+        GST_DEBUG_OBJECT(cencdecrypt, "Transforming caps going downstream");
         othercaps = gst_caps_new_empty();
         size_t size = gst_caps_get_size(caps);
         for (size_t index = 0; index < size; ++index) {
+
+            // TODO: free upstreamStruct?
             GstStructure* upstreamStruct = gst_caps_get_structure(caps, index);
             GstStructure* copyUpstream = gst_structure_copy(upstreamStruct);
 
@@ -195,7 +195,18 @@ static gboolean SinkEvent(GstBaseTransform* trans, GstEvent* event)
     GST_DEBUG_OBJECT(cencdecrypt, "sink_event");
     switch (GST_EVENT_TYPE(event)) {
     case GST_EVENT_PROTECTION: {
-        gboolean result = cencdecrypt->_impl->_decryptor->HandleProtection(event);
+        const char *systemId, *origin;
+        GstBuffer* initData;
+
+        gst_event_parse_protection(event, &systemId, &initData, &origin);
+        BufferView initDataView(initData, GST_MAP_READ);
+
+        gboolean result = cencdecrypt->_impl->_decryptor->Initialize(
+            std::unique_ptr<IExchangeFactory>(new ExchangeFactory()),
+            systemId,
+            origin,
+            initDataView);
+
         gst_event_unref(event);
         return result;
     }
@@ -210,8 +221,8 @@ static GstFlowReturn TransformIp(GstBaseTransform* trans, GstBuffer* buffer)
     GstCencDecrypt* cencdecrypt = GST_CENCDECRYPT(trans);
 
     GST_DEBUG_OBJECT(cencdecrypt, "transform_ip");
-
-    return cencdecrypt->_impl->_decryptor->Decrypt(buffer);
+    auto encryptedBuffer = std::make_shared<EncryptedBuffer>(buffer);
+    return cencdecrypt->_impl->_decryptor->Decrypt(encryptedBuffer);
 }
 
 void Finalize(GObject* object)
@@ -221,8 +232,7 @@ void Finalize(GObject* object)
     G_OBJECT_CLASS(gst_cencdecrypt_parent_class)->finalize(object);
 }
 
-static gboolean
-plugin_init(GstPlugin* plugin)
+static gboolean plugin_init(GstPlugin* plugin)
 {
     return gst_element_register(plugin, "cencdecrypt", GST_RANK_PRIMARY,
         GST_TYPE_CENCDECRYPT);
